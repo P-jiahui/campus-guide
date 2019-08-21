@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0" />
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <link rel="stylesheet" type="text/css" href="../css/aui.css" />
+    <style type="text/css">
+        .aui-list .aui-list-item-media {
+            width: 3rem;
+        }
+
+        .notes-add {
+            position: fixed;
+            left: 0.5rem;
+            bottom: 0.5rem;
+            width: 3rem;
+            z-index: 99;
+        }
+
+        textarea {
+            height: 8rem;
+            background-color: #ffffff;
+            padding: 0.5rem;
+        }
+
+        .photos img {
+            display: block;
+            width: 100%;
+        }
+
+        .add-photos>div {
+            width: 100%;
+            height: 5.15rem;
+            line-height: 5.15rem;
+        }
+
+        .add-photos>div .aui-iconfont {
+            font-size: 2rem;
+            color: #ccc;
+        }
+
+        .image-item {
+            position: relative;
+            height: 5.3rem;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+
+        .image-item img {
+            display: block;
+            margin: 0 auto;
+            width: auto;
+            height: 100%;
+        }
+
+        .image-item .delete-btn {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 28px;
+            height: 28px;
+            background-color: rgba(0, 0, 0, 0.7);
+            margin-left: -14px;
+            margin-top: -14px;
+            color: #ffffff;
+            text-align: center;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+    <p class="aui-text-left aui-margin-t-15" style="padding-left:1rem;">景点代号</p>
+    <div class="aui-list-item-input" style="background-color:#fff;">
+        <input type="text" id="scenic-spot-code" placeholder="景点代号" style="padding-left:1rem;">
+    </div>
+    <p class="aui-text-left aui-margin-t-15" style="padding-left:1rem;">景点</p>
+    <div class="aui-list-item-input" style="background-color:#fff;">
+        <input type="text" id="scenic-spot-name" placeholder="景点名称" style="padding-left:1rem;">
+    </div>
+    <p class="aui-text-left aui-margin-t-15" style="padding-left:1rem;">景点介绍</p>
+    <textarea placeholder="请输入景点介绍" id="scenic-introduction" style="padding-left:1rem;"></textarea>
+
+    <p class="aui-text-left aui-margin-t-15" style="padding-left:1rem;">景点图片</p>
+    <section class="aui-content-padded">
+        <div class="aui-row aui-row-padded">
+            <div class="aui-col-xs-4 image-item">
+                <img src="../image/demo1.png" class="notes-image" id="scenic-spot-img">
+            </div>
+            <div class="aui-col-xs-4 add-photos" onclick="showAction()">
+                <div class="aui-border aui-text-center">
+                    <i class="aui-iconfont aui-icon-plus"></i>
+                </div>
+            </div>
+        </div>
+        <div class="aui-btn aui-btn-info" style="margin:1rem 0 0 1rem;" onclick="submit()"><span class="aui-iconfont aui-icon-edit"></span>保存修改</div>
+    </section>
+</body>
+
+</html>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript">
+    var scenicSpot;
+    // 在scenicSpots数组中的下表，从scenry_manage_main.html传过来，修改后调用sendEvent函数，触发监听回调
+    var index;
+    var scenicSpotNameInput;
+    var scenicSpotIntroductionArea;
+    var scenicSpotCodeInput;
+    apiready = function() {
+        api.parseTapmode();
+
+        var editor = $api.getStorage('editor');
+        //是否学校编辑者登录
+        if (editor) {
+            scenicSpot = api.pageParam.scenicSpot;
+            index = api.pageParam.index;
+            scenicSpotNameInput = $api.byId('scenic-spot-name');
+            scenicSpotIntroductionArea = $api.byId('scenic-introduction');
+            scenicSpotCodeInput = $api.byId('scenic-spot-code');
+            scenicSpotNameInput.value = scenicSpot.name;
+            scenicSpotIntroductionArea.value = scenicSpot.introduction;
+            scenicSpotCodeInput.value = scenicSpot.code;
+            $api.attr($api.byId('scenic-spot-img'), 'src', $baseUrl + scenicSpot.imgUrl);
+        } else {
+            alert("您没有登录编辑者账号!")
+            api.closeWin();
+            api.openWin({
+                name: 'editor_login',
+                url: './editor_login.html'
+            });
+        }
+    };
+
+    function showAction() {
+        api.actionSheet({
+            title: '上传学校平面图',
+            cancelTitle: '取消',
+            buttons: ['拍照', '从手机相册选择']
+        }, function(ret, err) {
+            if (ret) {
+                getPicture(ret.buttonIndex);
+            }
+        });
+    }
+    var imgSrc = ''
+
+    function submit() {
+        scenicIntroduction = scenicSpotIntroductionArea.value.trim();
+        scenicSpotName = scenicSpotNameInput.value.trim()
+        scenicSpotCode = scenicSpotNameInput.value.trim()
+        if (scenicIntroduction.length === 0 || scenicSpotName.length === 0) {
+            api.toast({
+                msg: '请填写完整信息',
+                duration: 2000,
+                location: 'bottom'
+            });
+            return;
+        }
+        scenicSpot.name = scenicSpotName;
+        scenicSpot.introduction = scenicIntroduction;
+        scenicSpot.scenicSpotCode = scenicSpotCode;
+        api.ajax({
+            url: $baseUrl + 'scenicSpots',
+            method: 'put',
+            data: {
+                values: scenicSpot,
+                files: {
+                    file: imgSrc
+                }
+            }
+        }, function(ret, err) {
+            if (ret) {
+                //alert(JSON.stringify(ret))
+                if (ret.code === 200) {
+                    scenicSpot = ret.data
+                    api.toast({
+                        msg: '修改成功',
+                        duration: 2000,
+                        location: 'bottom'
+                    });
+                    api.sendEvent({
+                        name: 'updateScenicSpot',
+                        extra: {
+                            scenicSpot: scenicSpot,
+                            index: index
+                        }
+                    });
+
+                } else {
+                    api.toast({
+                        msg: '修改失败',
+                        duration: 2000,
+                        location: 'bottom'
+                    });
+                }
+            } else {
+                api.toast({
+                    msg: '请求异常！',
+                    duration: 2000,
+                    location: 'bottom'
+                });
+            }
+        });
+
+    }
+    //获取相机还是相册
+    function getPicture(sourceType) {
+        if (sourceType == 1) { // 拍照
+            //获取一张图片
+            api.getPicture({
+                sourceType: 'camera', //拍照
+                encodingType: 'png',
+                mediaValue: 'pic',
+                allowEdit: false,
+                //destinationType: 'base64',  //返回base64地址
+                quality: 90,
+                saveToPhotoAlbum: true
+            }, function(ret, err) {
+                //var imgSrc = ret.base64Data;  如果是base64，要用这个属性获取地址
+                // 获取拍照数据并处理
+                if (ret) {
+                    if (imgSrc != "") {
+                        var ele = $api.dom('#scenic-spot-img');
+                        $api.attr(ele, 'src', imgSrc);
+                    }
+                }
+            });
+        } else if (sourceType == 2) { // 从相册中选择
+            api.getPicture({
+                sourceType: 'album', //从相册中选择
+                encodingType: 'jpg',
+                mediaValue: 'pic',
+                allowEdit: false,
+                //destinationType: 'base64',  //返回base64地址
+                quality: 90,
+                saveToPhotoAlbum: true
+            }, function(ret, err) {
+                // 获取拍照数据并处理
+                //var imgSrc = ret.base64Data;  如果是base64，要用这个属性获取地址
+                if (ret) {
+                    imgSrc = ret.data;
+                    if (imgSrc != "") {
+                        var ele = $api.dom('#scenic-spot-img');
+                        $api.attr(ele, 'src', imgSrc);
+                    }
+                }
+            });
+        }
+    }
+</script>

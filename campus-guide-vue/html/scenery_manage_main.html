@@ -1,0 +1,183 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0" />
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <title>景点维护</title>
+    <link rel="stylesheet" type="text/css" href="../css/aui.css" />
+    <style>
+        .text-light {
+            color: #999 !important;
+        }
+
+        .aui-radio {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        img {
+            width: 5rem;
+            height: auto;
+            float: right;
+            margin-top: 0.2rem;
+            margin-right: 6rem;
+        }
+    </style>
+</head>
+
+<body>
+    <section id="app" class="aui-content">
+        <div v-for="(ss,index) in scenicSpots" :key="ss.scenicSpotId" class="aui-card-list">
+            <img :src="$baseUrl + ss.imgUrl">
+            <div class="aui-card-list-header aui-font-size-14">
+                {{ss.name}}({{ss.code}})
+            </div>
+            <div class="aui-card-list-content-padded aui-padded-t-0 text-light">
+                {{ss.introduction}}
+            </div>
+            <div class="aui-card-list-footer aui-border-t">
+                <div>
+                    <span @click="toEditPage(ss,index)"><i class="aui-iconfont aui-icon-edit aui-margin-r-5 aui-font-size-14"></i>编辑</span>
+                    <span @click="toDelete(ss.scenicSpotId,index)"><i class="aui-iconfont aui-icon-trash aui-margin-r-5 aui-margin-l-15 aui-font-size-14"></i>删除</span>
+                </div>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+    </section>
+</body>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript" src="../script/vue.min.js"></script>
+<script type="text/javascript">
+    var school;
+    apiready = function() {
+        api.parseTapmode();
+        school = $api.getStorage('school')
+        var app = new Vue({
+            el: '#app',
+            data: {
+                scenicSpots: []
+            },
+            mounted: function() {},
+            methods: {
+                toEditPage: function(scenicSpot, index) {
+                    api.openWin({
+                        name: 'scenery_edit',
+                        url: './scenery_edit.html',
+                        pageParam: {
+                            scenicSpot: scenicSpot,
+                            index: index
+                        }
+                    });
+                },
+                toDelete: function(scenicSpotId, index) {
+                    api.confirm({
+                        title: '确认信息',
+                        msg: '是否删除景点',
+                        buttons: ['确定', '取消']
+                    }, function(ret, err) {
+                        if (ret) {
+                            var buttonIndex = ret.buttonIndex;
+                            if (buttonIndex == 1) {
+                                api.ajax({
+                                    url: $baseUrl + 'scenicSpots/' + scenicSpotId,
+                                    method: 'delete',
+                                }, function(ret, err) {
+                                    if (ret) {
+                                        if (ret.code === 200) {
+                                            //alert(JSON.stringify(ret.data))
+                                            app.scenicSpots.splice(index, 1);
+                                            api.toast({
+                                                msg: '删除成功',
+                                                duration: 2000,
+                                                location: 'bottom'
+                                            });
+                                        } else {
+                                            api.toast({
+                                                msg: '出错了!' + ret.message,
+                                                duration: 2000,
+                                                location: 'bottom'
+                                            });
+                                        }
+                                    } else {
+                                        api.toast({
+                                            msg: '请求异常',
+                                            duration: 2000,
+                                            location: 'bottom'
+                                        });
+                                    }
+                                });
+                            } else {
+                                api.toast({
+                                    msg: '取消删除',
+                                    duration: 2000,
+                                    location: 'bottom'
+                                });
+                            }
+                        }
+                    });
+
+
+                }
+            }
+        });
+
+        var editor = $api.getStorage('editor')
+            //是否学校编辑者登录
+        if (editor) {
+            getAllScenery();
+        } else {
+            alert("您没有登录编辑者账号!")
+            api.closeWin();
+            api.openWin({
+                name: 'editor_login',
+                url: './editor_login.html'
+            });
+            return;
+        }
+        api.addEventListener({
+            name: 'updateScenicSpot'
+        }, function(ret, err) {
+            scenicSpot = app.scenicSpots[ret.value.index];
+            updatedScenicSpot = ret.value.scenicSpot;
+            scenicSpot.code = updatedScenicSpot.code;
+            scenicSpot.name = updatedScenicSpot.name;
+            scenicSpot.introduction = updatedScenicSpot.introduction;
+            scenicSpot.imgUrl = updatedScenicSpot.imgUrl;
+        });
+        api.addEventListener({
+            name: 'addNewScenicSpot'
+        }, function(ret, err) {
+            app.scenicSpots.push(ret.value.scenicSpot);
+        });
+
+        function getAllScenery() {
+            api.ajax({
+                url: $baseUrl + 'scenicSpots?schoolCode=' + school.code,
+                method: 'get'
+            }, function(ret, err) {
+                if (ret) {
+                    if (ret.code === 200) {
+                        //alert(JSON.stringify(ret.data))
+                        app.scenicSpots = ret.data
+                    } else {
+                        api.toast({
+                            msg: '出错了!' + ret.message,
+                            duration: 2000,
+                            location: 'bottom'
+                        });
+                    }
+                } else {
+                    api.toast({
+                        msg: '请求异常',
+                        duration: 2000,
+                        location: 'bottom'
+                    });
+                }
+            });
+        }
+    };
+</script>
+
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0" />
+    <meta name="format-detection" content="telephone=no,email=no,date=no,address=no">
+    <title>校园风光</title>
+    <link rel="stylesheet" type="text/css" href="../css/api.css" />
+    <link rel="stylesheet" type="text/css" href="../css/style.css" />
+    <link rel="stylesheet" type="text/css" href="../css/aui.css" />
+    <style type="text/css">
+        //下面的是设置放大后图片的后面的那个背景div，就是设置它的透明度，还有背景颜色，这个可以根据的自己的喜好，随心所欲的自己你想要的效果，在这里，我设置的黑色的背景，并且把统设置为55%;
+        div#gray {
+            //背景颜色
+            background: black;
+            //设置透明度
+            opacity: 0.55;
+            filter: alpha(opacity=55);
+            position: absolute;
+            top: 0px;
+            left: 0px;
+        }
+    </style>
+</head>
+
+<body>
+    <section id="app" class="aui-content">
+        <div class="aui-list-header" style="padding-left:1rem">
+            校园风光
+        </div>
+        <div class="aui-searchbar" id="search">
+            <div class="aui-searchbar-input aui-border-radius" tapmode>
+                <i class="aui-iconfont aui-icon-search"></i>
+                <input type="search" placeholder="请输入景点名称" id="search-scenery-input" onKeyup="doSearch(this.value)">
+            </div>
+            <div class="aui-searchbar-cancel" tapmod onclick="cancelSearch()">X</div>
+        </div>
+        <div v-for="ss in scenicSpots" v-bind:key="ss.scenicSpotId" class="aui-card-list">
+            <div class="aui-card-list-header aui-card-list-user aui-border-b">
+                <div class="aui-card-list-user-avatar">
+                    <img :src="$baseUrl + ss.imgUrl" class="aui-img-round" />
+                </div>
+                <div class="aui-card-list-user-name">
+                    <div>{{ss.name}}</div>
+                </div>
+                <div class="aui-card-list-user-info">{{ss.introduction}}</div>
+            </div>
+            <div class="aui-card-list-content-padded">
+                <img class="scenery-img" :src="$baseUrl + ss.imgUrl" onclick="largeImg(this);" />
+            </div>
+        </div>
+        <div>
+        </div>
+
+    </section>
+    <!-- 图片弹出层 -->
+    <div id="outerdiv" style="position:fixed;top:0;left:0;background:rgba(0,0,0,0.7);z-index:2;width:100%;height:100%;display:none;">
+        <div id="innerdiv" style="position:absolute;">
+            <img id="bigimg" style="border:5px solid #fff;" src="" />
+        </div>
+    </div>
+</body>
+
+</html>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript" src="../script/vue.min.js"></script>
+<script type="text/javascript" src="../script/largeImg.js"></script>
+<script type="text/javascript" src="../script/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+    var school;
+    var app;
+    var page = 0;
+    var searchPage = 0;
+    var pageSize = 5;
+    var isSearching = false; // 是否在搜索
+
+    apiready = function() {
+        api.parseTapmode();
+        app = new Vue({
+            el: '#app',
+            data: {
+                scenicSpots: []
+            }
+        });
+        school = $api.getStorage('school')
+        getPageScenery(false);
+        initEventListenter();
+        api.setRefreshHeaderInfo({
+            //loadingImg: 'widget://image/loading_more.gif',
+            bgColor: '#ccc',
+            textColor: '#fff',
+            textDown: '下拉刷新...',
+            textUp: '松开刷新...'
+        }, function(ret, err) {
+            //在这里从服务器加载数据，加载完成后调用api.refreshHeaderLoadDone()方法恢复组件到默认状态
+            if (isSearching) {
+                searchPage = 0;
+                doSearch($("#search-scenery-input").val(), false);
+            } else {
+                initPage();
+                cancelSearch();
+                getPageScenery(false);
+            }
+            setTimeout(function() {
+                api.refreshHeaderLoadDone();
+            }, 1000);
+        });
+    };
+
+    /* 添加下拉到底部的监听事件 */
+    function initEventListenter() {
+        api.addEventListener({
+            name: 'scrolltobottom',
+            extra: {
+                threshold: 0
+            }
+        }, function(ret, err) {
+            if (isSearching) {
+                searchPage += 1;
+                doSearch($("#search-scenery-input").val(), true)
+            } else {
+                page += 1;
+                getPageScenery(true)
+            }
+        });
+
+    }
+    function initPage() {
+      page = 0;
+      searchPage = 0;
+    }
+    function cancelSearch() {
+        isSearching = false;
+        $("#search-scenery-input").val("")
+    }
+
+    function addMoreScenery(moreScenery) {
+        if (moreScenery) {
+            if (moreScenery.length !== 0) {
+                for (var index in moreScenery) {
+                    app.scenicSpots.push(moreScenery[index]);
+                }
+            } else {
+                page -= 1;
+                api.toast({
+                    msg: '已经到最底部了!',
+                    duration: 2000,
+                    location: 'bottom'
+                });
+            }
+        } else {
+            api.toast({
+                msg: '数据请求异常，请重试!',
+                duration: 2000,
+                location: 'bottom'
+            });
+        }
+    }
+    function getPageScenery(isMore) {
+        api.ajax({
+            url: $baseUrl + 'scenicSpots?schoolCode=' + school.code + '&page=' + page + '&pageSize=' + pageSize,
+            method: 'get'
+        }, function(ret, err) {
+            if (ret) {
+                if (ret.code === 200) {
+                    if (isMore) {
+                        addMoreScenery(ret.data);
+                    } else {
+                        app.scenicSpots = ret.data
+                    }
+                } else {
+                    api.toast({
+                        msg: '出错了!' + ret.message,
+                        duration: 2000,
+                        location: 'bottom'
+                    });
+                }
+            } else {
+                api.toast({
+                    msg: '请求异常',
+                    duration: 2000,
+                    location: 'bottom'
+                });
+            }
+        });
+    }
+
+    function doSearch(keywords, isMore) {
+        isSearching = true;
+        if (keywords.length !== 0) {
+            api.ajax({
+                url: $baseUrl + 'scenicSpots?schoolCode=' + school.code + '&name=' + keywords + '&page=' + searchPage + '&pageSize=' + pageSize,
+                method: 'get'
+            }, function(ret, err) {
+                if (ret) {
+                    if (ret.code === 200) {
+                        if (isMore) {
+                            addMoreScenery(ret.data)
+                        } else {
+                            app.scenicSpots = ret.data
+                        }
+                    } else {
+                        api.toast({
+                            msg: '出错了!' + ret.message,
+                            duration: 2000,
+                            location: 'bottom'
+                        });
+                    }
+                } else {
+                    api.toast({
+                        msg: '请求异常!',
+                        duration: 2000,
+                        location: 'bottom'
+                    });
+                }
+            });
+        } else if (keywords.length > 50) {
+            api.toast({
+                msg: '景点名称不能长于50个字符',
+                duration: 2000,
+                location: 'bottom'
+            });
+        } else {
+            initPage();
+            cancelSearch();
+            getPageScenery(false);
+        }
+    }
+</script>

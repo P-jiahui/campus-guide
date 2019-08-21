@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="maximum-scale=1.0,minimum-scale=1.0,user-scalable=0,width=device-width,initial-scale=1.0" />
+    <title>title</title>
+    <link rel="stylesheet" type="text/css" href="../css/api.css" />
+    <link rel="stylesheet" type="text/css" href="../css/aui.css" />
+    <style type="text/css">
+        //下面的是设置放大后图片的后面的那个背景div，就是设置它的透明度，还有背景颜色，这个可以根据的自己的喜好，随心所欲的自己你想要的效果，在这里，我设置的黑色的背景，并且把统设置为55%;
+        div#gray {
+            //背景颜色
+            background: black;
+            //设置透明度
+            opacity: 0.55;
+            filter: alpha(opacity=55);
+            position: absolute;
+            top: 0px;
+            left: 0px;
+        }
+    </style>
+</head>
+
+<body>
+    <ul id="app" class="aui-list aui-form-list">
+        <li class="aui-list-header">路线添加</li>
+        <li class="aui-list-item">
+            <div class="aui-list-item-inner">
+                <div class="aui-list-item-label">
+                    起点
+                </div>
+                <div class="aui-list-item-input">
+                    <input type="text" v-model="startName" list="startList" placeholder="请输入起点的名称" @keyup="autoCompleted(startName)">
+                    <datalist id="startList">
+                        <option v-for="item in searchingScenicSpots" :label="item.code" :value="item.name" :key="item.scenicSpotId"/>
+                    </datalist>
+                </div>
+            </div>
+        </li>
+        <li class="aui-list-item">
+            <div class="aui-list-item-inner">
+                <div class="aui-list-item-label">
+                    终点
+                </div>
+                <div class="aui-list-item-input">
+                    <input type="text" v-model="endName" list="endList" placeholder="请输入终点的名称" @keyup="autoCompleted(endName)">
+                    <datalist id="endList">
+                        <option v-for="item in searchingScenicSpots" :label="item.code" :value="item.name" :key="item.scenicSpotId"/>
+                    </datalist>
+                </div>
+            </div>
+        </li>
+        <li class="aui-list-item">
+            <div class="aui-list-item-inner">
+                <div class="aui-list-item-label">
+                    距离
+                </div>
+                <div class="aui-list-item-input">
+                    <input type="number" v-model="distance" placeholder="请输入两个景点之间的距离">
+                </div>
+            </div>
+        </li>
+        <li class="aui-list-item">
+            <div class="aui-list-item-inner aui-list-item-center aui-list-item-btn">
+                <div class="aui-btn aui-btn-info aui-margin-r-5" @click="addRoute">添加</div>
+                <div class="aui-btn aui-btn-danger aui-margin-l-5" @click="cancel">取消</div>
+            </div>
+        </li>
+    </ul>
+    <!-- 图片弹出层 -->
+    <div id="outerdiv" style="position:fixed;top:0;left:0;background:rgba(0,0,0,0.7);z-index:2;width:100%;height:100%;display:none;">
+        <div id="innerdiv" style="position:absolute;">
+            <img id="bigimg" style="border:5px solid #fff;" src="" />
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="../script/api.js"></script>
+<script type="text/javascript" src="../script/vue.min.js"></script>
+<script type="text/javascript" src="../script/largeImg.js"></script>
+<script type="text/javascript" src="../script/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+    apiready = function() {
+        api.parseTapmode();
+        var app = new Vue({
+            el: '#app',
+            data: {
+                school: {},
+                startName: "",
+                endName: "",
+                distacne: null,
+                scenicSpots: [],
+                searchingScenicSpots: null,
+                distance: null
+            },
+            computed: {
+                route: function() {
+                    length = this.scenicSpots.length - 1;
+                    route = "";
+                    for (i = 0; i <= length; i++) {
+                        if (length !== i) {
+                            route += this.scenicSpots[i].name + '->'
+                        } else {
+                            route += this.scenicSpots[i].name
+                        }
+                    }
+                    return route
+                }
+            },
+            mounted: function() {
+                this.school = $api.getStorage('school');
+            },
+            methods: {
+                cancel: function() {
+                    this.startName = "";
+                    this.endName = "";
+                    this.scenicSpots = [];
+                    this.searchingScenicSpots = [];
+                },
+                autoCompleted: function(name) {
+                    var trimName = $api.trim(name)
+                    if (trimName.length === 0 || trimName.length > 50) {
+                        return;
+                    }
+                    api.ajax({
+                        url: $baseUrl + 'scenicSpots?schoolCode=' + this.school.code + '&name=' + trimName + '&page=0&pageSize=10',
+                        method: 'get'
+                    }, function(ret, err) {
+                        if (ret) {
+                            if (ret.code === 200) {
+                                app.searchingScenicSpots = ret.data
+                            }
+                        } else {
+                            api.toast({
+                                msg: '请求异常!',
+                                duration: 2000,
+                                location: 'bottom'
+                            });
+                        }
+                    });
+                },
+                addRoute: function() {
+                    var trimStartName = $api.trim(this.startName)
+                    var trimEndName = $api.trim(this.endName)
+                    if (trimStartName.length === 0 || trimEndName.length === 0) {
+                        api.toast({
+                            msg: '请输入起点和终点名称',
+                            duration: 2000,
+                            location: 'bottom'
+                        });
+                        return;
+                    }
+                    if (trimStartName.length > 50 || trimStartName.length > 50) {
+                        api.toast({
+                            msg: '地点名称不能长于50个字符',
+                            duration: 2000,
+                            location: 'bottom'
+                        });
+                        return;
+                    }
+                    if (trimStartName === trimEndName) {
+                        api.toast({
+                            msg: '起点和终点不能是同一地点',
+                            duration: 2000,
+                            location: 'bottom'
+                        });
+                        return;
+                    }
+                    if (this.distance === null || this.distance.trim() === '') {
+                        api.toast({
+                            msg: '请输入距离',
+                            duration: 2000,
+                            location: 'bottom'
+                        });
+                        return;
+                    }
+                    this.doAddRoute();
+                },
+                doAddRoute: function() {
+                    api.ajax({
+                        url: $baseUrl + 'scenicSpots/route',
+                        data: {
+                            values: {
+                                start: this.startName,
+                                end: this.endName,
+                                distance: this.distance
+                            }
+                        },
+                        method: 'post'
+                    }, function(ret, err) {
+                        if (ret) {
+                            if (ret.code === 200) {
+                                api.toast({
+                                    msg: '请检查是否输入正确的景点名称',
+                                    duration: 2000,
+                                    location: 'bottom'
+                                });
+                            } else if (ret.code === 1001) {
+                                api.toast({
+                                    msg: '请确保已经添加好景点',
+                                    duration: 2000,
+                                    location: 'bottom'
+                                });
+                            } else {
+                                api.toast({
+                                    msg: '请求出错,请稍后重试',
+                                    duration: 2000,
+                                    location: 'bottom'
+                                });
+                            }
+                        } else {
+                            api.toast({
+                                msg: '请求异常!',
+                                duration: 2000,
+                                location: 'bottom'
+                            });
+                        }
+                    });
+                }
+            }
+        });
+    };
+</script>
+
+</html>
